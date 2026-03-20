@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 
 interface SearchResult {
@@ -12,11 +12,13 @@ interface SearchResult {
   url: string;
 }
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const query = searchParams.get("q") || "";
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [inputValue, setInputValue] = useState(query);
 
   useEffect(() => {
     if (!query) {
@@ -37,8 +39,13 @@ export default function SearchPage() {
       });
   }, [query]);
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    router.push(`/search?q=${encodeURIComponent(inputValue)}`);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-8 py-12">
+    <>
       <Link
         href="/"
         className="text-kente-green hover:text-kente-gold text-sm mb-8 inline-block"
@@ -54,19 +61,15 @@ export default function SearchPage() {
       </p>
 
       {query && (
-        <div className="mb-8">
+        <form onSubmit={handleSearch} className="mb-8">
           <input
             type="text"
-            defaultValue={query}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                window.location.href = `/search?q=${encodeURIComponent((e.target as HTMLInputElement).value)}`;
-              }
-            }}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-kente-green"
             placeholder="Search Afrikapedia..."
           />
-        </div>
+        </form>
       )}
 
       {loading && (
@@ -135,6 +138,16 @@ export default function SearchPage() {
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <div className="max-w-4xl mx-auto px-8 py-12">
+      <Suspense fallback={<div className="py-12">Loading search...</div>}>
+        <SearchContent />
+      </Suspense>
     </div>
   );
 }
