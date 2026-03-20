@@ -8,7 +8,7 @@ interface PageProps {
 
 export default async function EditArticlePage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createClient();
 
   const { data: article, error } = await supabase
     .from("articles")
