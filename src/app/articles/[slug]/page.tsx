@@ -1,38 +1,48 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getArticleSummary, isAfricaRelevant } from "@/lib/wikipedia";
+import { fetchArticle, getPrefetchedSlugs, isAfricaRelevant } from "@/lib/article-cache";
 import { parseMarkdown } from "@/lib/markdown";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-// Convert slug to title case (e.g., "mali-empire" -> "Mali Empire")
-function slugToTitle(slug: string): string {
-  return slug
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+// Revalidate articles every hour
+export const revalidate = 3600;
+
+// Generate static params from pre-fetched articles
+export async function generateStaticParams() {
+  const slugs = getPrefetchedSlugs();
+  
+  // Add some default popular articles if no pre-fetched yet
+  const defaultSlugs = [
+    "mali-empire",
+    "ubuntu-philosophy",
+    "ancient-egypt",
+    "kingdom-of-aksum",
+    "timbuktu",
+    "mansa-musa",
+  ];
+
+  const allSlugs = slugs.length > 0 ? slugs : defaultSlugs;
+
+  return allSlugs.map((slug) => ({ slug }));
 }
 
 export default async function ArticlePage({ params }: PageProps) {
   const { slug } = await params;
-  const title = slugToTitle(slug);
 
-  // Fetch from Wikipedia
-  const wikipediaArticle = await getArticleSummary(title);
+  // Fetch from cache or Wikipedia API
+  const article = await fetchArticle(slug);
 
-  if (!wikipediaArticle || !isAfricaRelevant(wikipediaArticle.title, wikipediaArticle.extract)) {
+  if (!article) {
     notFound();
   }
 
-  const article = {
-    title: wikipediaArticle.title,
-    content: wikipediaArticle.extract,
-    thumbnail: wikipediaArticle.thumbnail?.source,
-    description: wikipediaArticle.description,
-    sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(wikipediaArticle.title)}`,
-  };
+  // Optional: Filter for Africa-relevance (skip for pre-fetched)
+  if (!article.fetchedAt && !isAfricaRelevant(article.title, article.extract)) {
+    notFound();
+  }
 
   const date = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -60,7 +70,7 @@ function ArticleContent({
     content: string;
     thumbnail?: string;
     description?: string;
-    sourceUrl: string;
+    url: string;
   };
   date: string;
   readTime: string;
@@ -112,7 +122,7 @@ function ArticleContent({
         </p>
         <div className="flex gap-3">
           <a
-            href={article.sourceUrl}
+            href={article.url}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block bg-kente-green text-white px-6 py-2 rounded font-medium hover:bg-kente-gold transition-colors"
