@@ -1,126 +1,49 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-server";
+import { getArticleSummary, isAfricaRelevant } from "@/lib/wikipedia";
 import { parseMarkdown } from "@/lib/markdown";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+// Convert slug to title case (e.g., "mali-empire" -> "Mali Empire")
+function slugToTitle(slug: string): string {
+  return slug
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default async function ArticlePage({ params }: PageProps) {
   const { slug } = await params;
-  const supabase = createClient();
+  const title = slugToTitle(slug);
 
-  const { data: article, error } = await supabase
-    .from("articles")
-    .select(
-      `
-      *,
-      categories (name),
-      profiles (username)
-    `,
-    )
-    .eq("slug", slug)
-    .single();
+  // Fetch from Wikipedia
+  const wikipediaArticle = await getArticleSummary(title);
 
-  if (error || !article) {
-    // Fallback to mock data for demo
-    const mockArticles: Record<string, any> = {
-      "mali-empire": {
-        title: "The Mali Empire: West Africa's Golden Age",
-        excerpt:
-          "At its height in the 14th century, the Mali Empire was among the largest empires in the world.",
-        content: `The Mali Empire (c. 1235 – 1600) was a West African empire that at its height ruled over an area stretching from the Atlantic coast to the Sahara Desert. Founded by Sundiata Keita, the empire is famous for its wealth, trade networks, and cultural achievements.
-
-## Origins and Foundation
-
-The empire emerged from the ruins of the Ghana Empire and was founded by Sundiata Keita, a legendary warrior prince who united the Mandé peoples of western Mali. According to oral tradition, Sundiata overcame great obstacles, including physical disability, to fulfill a prophecy and establish a realm that would become one of history's wealthiest states.
-
-## The Reign of Mansa Musa
-
-Perhaps no African ruler in history is more famous than Mansa Musa, who ruled from 1312 to 1337. His legendary pilgrimage to Mecca in 1324, during which he reportedly carried 60,000 men, 12,000 slaves, and 100 tons of gold, famously disrupted Egypt's gold economy for over a decade. Musa's extravagance was so great that he gave away so much gold that it crashed the value across North Africa.
-
-## Economy and Trade
-
-The Mali Empire controlled the trans-Saharan gold and salt trade, which made it extraordinarily wealthy. The empire's capital, Timbuktu, became a renowned center of learning and commerce, attracting scholars, traders, and merchants from across the Islamic world.
-
-## Legacy
-
-The Mali Empire's legacy extends far beyond its territorial bounds. It established traditions of centralized governance, Islamic scholarship, and economic prosperity that continue to influence West African societies today.`,
-        category: { name: "Kingdoms & Empires" },
-        profiles: { username: "Dr. Amina Yusuf" },
-        created_at: "2026-03-15",
-        id: "demo-1",
-      },
-      "ubuntu-philosophy": {
-        title: "Ubuntu: I Am Because We Are",
-        excerpt:
-          "A philosophical concept originating in Southern African cultures emphasizing collective humanity.",
-        content: `Ubuntu is a Nguni Bantu term meaning "humanity" or "I am because we are." It is a philosophical concept that emphasizes community, mutual care, and the interconnectedness of all people.
-
-## Origins
-
-Ubuntu has roots in various Southern African cultures, particularly among the Xhosa, Zulu, and Shona peoples. The concept has been part of African social philosophy for centuries and continues to shape communities across the continent.
-
-## Core Principles
-
-The philosophy of Ubuntu centers on several key ideas:
-- **Interconnectedness**: Individuals are defined by their relationships with others
-- **Compassion**: Showing empathy and care for fellow community members
-- **Reciprocity**: The idea that we give and receive in equal measure
-- **Human dignity**: Every person deserves respect regardless of status
-
-## Ubuntu in Practice
-
-In practice, Ubuntu manifests in various ways:
-- Extended family structures that care for all members
-- Community dispute resolution through dialogue
-- Collective responsibility for children's upbringing
-- Sharing resources during times of need
-
-## Global Recognition
-
-Ubuntu has gained international recognition, influencing fields from computer science (the Ubuntu Linux operating system) to diplomacy and conflict resolution. The concept offers an alternative to individualistic worldviews, emphasizing that human flourishing occurs within community.`,
-        category: { name: "Philosophy" },
-        profiles: { username: "Prof. Thabo Mkhize" },
-        created_at: "2026-03-10",
-        id: "demo-2",
-      },
-    };
-
-    const mockArticle = mockArticles[slug];
-    if (!mockArticle) {
-      notFound();
-    }
-
-    const date = new Date(mockArticle.created_at).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const readTime =
-      Math.ceil(mockArticle.content.split(" ").length / 200) + " min read";
-
-    return (
-      <ArticleContent article={mockArticle} date={date} readTime={readTime} />
-    );
+  if (!wikipediaArticle || !isAfricaRelevant(wikipediaArticle.title, wikipediaArticle.extract)) {
+    notFound();
   }
 
-  const date = new Date(article.created_at).toLocaleDateString("en-US", {
+  const article = {
+    title: wikipediaArticle.title,
+    content: wikipediaArticle.extract,
+    thumbnail: wikipediaArticle.thumbnail?.source,
+    description: wikipediaArticle.description,
+    sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(wikipediaArticle.title)}`,
+  };
+
+  const date = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const readTime =
-    Math.ceil(article.content.split(" ").length / 200) + " min read";
+  const readTime = Math.ceil(article.content.split(" ").length / 200) + " min read";
 
   return (
     <ArticleContent
-      article={{
-        ...article,
-        category: article.categories?.name || "Uncategorized",
-        author: article.profiles?.username || "Anonymous",
-      }}
+      article={article}
       date={date}
       readTime={readTime}
     />
@@ -132,7 +55,13 @@ function ArticleContent({
   date,
   readTime,
 }: {
-  article: any;
+  article: {
+    title: string;
+    content: string;
+    thumbnail?: string;
+    description?: string;
+    sourceUrl: string;
+  };
   date: string;
   readTime: string;
 }) {
@@ -147,9 +76,17 @@ function ArticleContent({
         ← Back to Home
       </Link>
 
+      {article.thumbnail && (
+        <img
+          src={article.thumbnail}
+          alt={article.title}
+          className="w-full h-64 object-cover rounded-lg mb-6"
+        />
+      )}
+
       <div className="mb-6">
         <span className="text-kente-gold text-xs tracking-widest uppercase font-medium">
-          {article.category?.name || article.category}
+          {article.description || "Wikipedia Article"}
         </span>
       </div>
 
@@ -158,7 +95,7 @@ function ArticleContent({
       </h1>
 
       <p className="text-gray-500 text-sm mb-8">
-        By {article.author} · {date} · {readTime}
+        Source: Wikipedia · {date} · {readTime}
       </p>
 
       <article
@@ -168,18 +105,27 @@ function ArticleContent({
 
       <div className="mt-16 p-8 bg-sand rounded border border-[#e8dfc8]">
         <h3 className="font-display text-xl font-bold text-ink mb-3">
-          Contribute to this article
+          About this article
         </h3>
         <p className="text-gray-600 mb-4">
-          Afrikapedia is built by contributors like you. Help improve this
-          article.
+          This article content is from Wikipedia and is available under CC-BY-SA license.
         </p>
-        <Link
-          href={`/edit/${article.id}`}
-          className="inline-block bg-kente-green text-white px-6 py-2 rounded font-medium hover:bg-kente-gold transition-colors"
-        >
-          Edit Article
-        </Link>
+        <div className="flex gap-3">
+          <a
+            href={article.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block bg-kente-green text-white px-6 py-2 rounded font-medium hover:bg-kente-gold transition-colors"
+          >
+            View on Wikipedia
+          </a>
+          <Link
+            href={`/contribute?article=${encodeURIComponent(article.title)}`}
+            className="inline-block bg-white text-kente-green border border-kente-green px-6 py-2 rounded font-medium hover:bg-kente-green hover:text-white transition-colors"
+          >
+            Contribute
+          </Link>
+        </div>
       </div>
     </div>
   );
