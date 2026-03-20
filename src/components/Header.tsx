@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function Header() {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const handleOpenSearch = () => setSearchOpen(true);
@@ -27,44 +30,14 @@ export default function Header() {
     };
   }, []);
 
-  const searchResults = [
-    {
-      icon: "👑",
-      title: "Mali Empire",
-      meta: "Kingdoms & Empires · West Africa",
-    },
-    {
-      icon: "🏺",
-      title: "Kingdom of Kush",
-      meta: "Ancient History · Northeast Africa",
-    },
-    {
-      icon: "🔭",
-      title: "Dogon Astronomy",
-      meta: "Indigenous Science · West Africa",
-    },
-    {
-      icon: "✍️",
-      title: "Ge'ez Script",
-      meta: "Languages & Scripts · East Africa",
-    },
-    {
-      icon: "💛",
-      title: "Ubuntu Philosophy",
-      meta: "Philosophy · Southern Africa",
-    },
-    { icon: "📱", title: "M-Pesa", meta: "Modern Innovation · East Africa" },
-    {
-      icon: "🏛️",
-      title: "Great Zimbabwe",
-      meta: "Architecture · Southern Africa",
-    },
-    {
-      icon: "🎭",
-      title: "Nok Terracotta",
-      meta: "Art & Culture · West Africa",
-    },
-  ];
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchOpen(false);
+      setSearchQuery("");
+    }
+  };
 
   return (
     <>
@@ -192,38 +165,28 @@ export default function Header() {
             className="bg-[--bg2] border border-[--border2] rounded w-full max-w-[640px] overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-4 p-[18px_22px] border-b border-[--border]">
-              <span className="text-[--text3] text-lg">⌕</span>
-              <input
-                type="text"
-                placeholder="Search Afrikapedia…"
-                className="flex-1 bg-none border-none outline-none font-serif text-lg text-[--text] placeholder-[--text3]"
-                autoFocus
-              />
-              <button
-                onClick={() => setSearchOpen(false)}
-                className="font-sans text-[11px] text-[--text3] bg-[--bg3] border border-[--border2] rounded px-2 py-1"
-              >
-                esc
-              </button>
-            </div>
-            <div className="max-h-[360px] overflow-y-auto py-2">
-              {searchResults.map((result) => (
-                <div
-                  key={result.title}
-                  className="flex items-center gap-4 p-[12px_22px] cursor-pointer hover:bg-[--bg3] transition-colors"
+            <form onSubmit={handleSearchSubmit}>
+              <div className="flex items-center gap-4 p-[18px_22px] border-b border-[--border]">
+                <span className="text-[--text3] text-lg">⌕</span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Afrikapedia…"
+                  className="flex-1 bg-none border-none outline-none font-serif text-lg text-[--text] placeholder-[--text3]"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(false)}
+                  className="font-sans text-[11px] text-[--text3] bg-[--bg3] border border-[--border2] rounded px-2 py-1"
                 >
-                  <span className="text-xl">{result.icon}</span>
-                  <div>
-                    <div className="font-display text-[14px] font-bold text-[--text]">
-                      {result.title}
-                    </div>
-                    <div className="font-sans text-[11px] text-[--text3]">
-                      {result.meta}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  esc
+                </button>
+              </div>
+            </form>
+            <div className="p-4 text-center text-[--text3] text-sm">
+              Search Wikipedia for African topics (e.g., "Mali Empire", "Ubuntu", "Ancient Egypt")
             </div>
           </div>
         </div>
