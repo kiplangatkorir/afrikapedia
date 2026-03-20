@@ -1,10 +1,12 @@
 import { cache } from "react";
 import * as fs from "fs";
 import * as path from "path";
+import { createClient } from "@/lib/supabase-server";
 
 // --- Types ---
 
 export interface Article {
+  id?: string;
   title: string;
   description?: string;
   extract: string;
@@ -13,6 +15,7 @@ export interface Article {
   url: string;
   fetchedAt?: string;
   isLocal?: boolean;
+  isFromSupabase?: boolean;
 }
 
 export interface WikipediaSearchResult {
@@ -129,23 +132,47 @@ function loadLocalArticle(slug: string): Article | null {
 // --- Main Service Functions ---
 
 /**
- * Fetch article (local -> cache -> wikipedia)
+ * Fetch article (supabase -> local -> cache -> wikipedia)
  */
 export const getArticle = cache(async (slug: string): Promise<Article | null> => {
-  // 1. Check runtime cache
+  // 1. Check Supabase first
+  try {
+    const supabase = createClient();
+    const { data: dbArticle } = await supabase
+      .from("articles")
+      .select("*")
+      .eq("slug", slug)
+      .single();
+
+    if (dbArticle) {
+      return {
+        id: dbArticle.id,
+        title: dbArticle.title,
+        description: dbArticle.excerpt,
+        extract: dbArticle.excerpt,
+        content: dbArticle.content,
+        url: `/articles/${dbArticle.slug}`,
+        isFromSupabase: true,
+      };
+    }
+  } catch (err) {
+    console.error("Supabase fetch error:", err);
+  }
+
+  // 2. Check runtime cache
   const cached = localCache.get(slug);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
   }
 
-  // 2. Try local file
+  // 3. Try local file
   const local = loadLocalArticle(slug);
   if (local) {
     localCache.set(slug, { data: local, timestamp: Date.now() });
     return local;
   }
 
-  // 3. Fallback to Wikipedia
+  // 4. Fallback to Wikipedia
   const title = slug.replace(/-/g, " ");
   try {
     const res = await fetch(`${WIKIPEDIA_API}/page/summary/${encodeURIComponent(title)}`, {

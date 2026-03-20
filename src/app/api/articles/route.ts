@@ -22,6 +22,23 @@ export async function POST(req: NextRequest) {
 
     const slug = generateSlug(title);
 
+    // If category_id is a slug, try to find the UUID
+    let actualCategoryId = category_id;
+    if (category_id && !category_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      const { data: catData } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("slug", category_id)
+        .single();
+      
+      if (catData) {
+        actualCategoryId = catData.id;
+      } else {
+        // If not found, use null or a default
+        actualCategoryId = null;
+      }
+    }
+
     const { data, error } = await supabase
       .from("articles")
       .insert([
@@ -30,7 +47,7 @@ export async function POST(req: NextRequest) {
           slug,
           excerpt: excerpt || "",
           content,
-          category_id,
+          category_id: actualCategoryId,
           featured: false,
           language_code: 'en'
         },

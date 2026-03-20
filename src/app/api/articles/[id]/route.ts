@@ -51,6 +51,20 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     const slug = generateSlug(title);
 
+    // If category_id is a slug, try to find the UUID
+    let actualCategoryId = category_id;
+    if (category_id && !category_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      const { data: catData } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("slug", category_id)
+        .single();
+      
+      if (catData) {
+        actualCategoryId = catData.id;
+      }
+    }
+
     const { data, error } = await supabase
       .from("articles")
       .update({
@@ -58,7 +72,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
         slug,
         excerpt: excerpt || "",
         content,
-        category_id,
+        category_id: actualCategoryId,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
