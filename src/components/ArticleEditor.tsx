@@ -52,7 +52,7 @@ export default function ArticleEditor({
       const endpoint =
         mode === "create"
           ? "/api/articles"
-          : `/api/articles/${initialData?.id}`;
+          : `/api/articles/${initialData?.slug}`;
       const method = mode === "create" ? "POST" : "PUT";
 
       const res = await fetch(endpoint, {
