@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchPages, isAfricaRelevant } from "@/lib/wikipedia";
+import { searchArticles } from "@/lib/article-service";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,21 +10,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ results: [] });
     }
 
-    // Search Wikipedia
-    const results = await searchPages(query, 20);
+    // Search Wikipedia (filtered for Africa relevance by the service)
+    const results = await searchArticles(query, 20);
 
-    // Filter for Africa-relevant content and transform
-    const filteredResults = results
-      .filter((result) => isAfricaRelevant(result.title, result.extract || ""))
-      .map((result) => ({
-        title: result.title,
-        description: result.description,
-        excerpt: result.extract?.slice(0, 200) + "..." || "",
-        thumbnail: result.thumbnail?.source,
-        url: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title)}`,
-      }));
+    // Transform for the search UI
+    const formattedResults = results.map((article) => ({
+      title: article.title,
+      description: article.description,
+      excerpt: article.extract?.slice(0, 200) + "..." || "",
+      thumbnail: article.thumbnail,
+      url: article.url,
+      slug: article.title.toLowerCase().replace(/ /g, "-"),
+    }));
 
-    return NextResponse.json({ results: filteredResults });
+    return NextResponse.json({ results: formattedResults });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(

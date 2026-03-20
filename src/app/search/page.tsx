@@ -10,6 +10,7 @@ interface SearchResult {
   excerpt: string;
   thumbnail?: string;
   url: string;
+  slug: string;
 }
 
 function SearchContent() {
@@ -41,96 +42,106 @@ function SearchContent() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(`/search?q=${encodeURIComponent(inputValue)}`);
+    if (inputValue.trim()) {
+      router.push(`/search?q=${encodeURIComponent(inputValue.trim())}`);
+    }
   };
 
   return (
-    <>
+    <div className="max-w-4xl mx-auto">
       <Link
         href="/"
-        className="text-kente-green hover:text-kente-gold text-sm mb-8 inline-block"
+        className="text-[--gold] hover:text-[--gold2] text-sm mb-8 inline-flex items-center gap-2 transition-colors"
       >
         ← Back to Home
       </Link>
 
-      <h1 className="font-display text-3xl font-bold text-ink mb-2">Search</h1>
-      <p className="text-gray-500 mb-8">
+      <h1 className="font-display text-4xl font-bold text-[--text] mb-2 tracking-tight">Search</h1>
+      <p className="text-[--text3] mb-10 font-serif italic">
         {query
-          ? `Results for "${query}"`
-          : "Search for African topics, history, and culture"}
+          ? `Searching the archives for "${query}"`
+          : "Discover African history, culture, and innovation"}
       </p>
 
-      {query && (
-        <form onSubmit={handleSearch} className="mb-8">
+      <form onSubmit={handleSearch} className="mb-12">
+        <div className="relative group">
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-kente-green"
+            className="w-full bg-[--bg2] border border-[--border] rounded-lg px-6 py-4 text-lg text-[--text] placeholder-[--text3] outline-none focus:border-[--gold] transition-all"
             placeholder="Search Afrikapedia..."
           />
-        </form>
-      )}
+          <button 
+            type="submit"
+            className="absolute right-3 top-1/2 -translate-y-1/2 bg-[--gold] text-[--bg] p-2 rounded-md hover:bg-[--gold2] transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+        </div>
+      </form>
 
       {loading && (
-        <div className="text-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-kente-green border-t-transparent rounded-full mx-auto" />
-          <p className="text-gray-500 mt-4">Searching Wikipedia...</p>
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="animate-spin w-10 h-10 border-4 border-[--gold] border-t-transparent rounded-full mb-4" />
+          <p className="text-[--text3] font-serif">Consulting the records...</p>
         </div>
       )}
 
       {!loading && results.length === 0 && query && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">No Africa-relevant results found.</p>
-          <p className="text-gray-400 text-sm mt-2">
-            Try a different search term related to African history, culture, or
-            people.
+        <div className="text-center py-20 bg-[--bg2] rounded-xl border border-dashed border-[--border]">
+          <div className="text-5xl mb-4 opacity-20">📜</div>
+          <p className="text-[--text2] text-lg font-display mb-2">No relevant entries found</p>
+          <p className="text-[--text3] text-sm max-w-sm mx-auto">
+            Try searching for broader African topics like "Mali Empire", "Great Zimbabwe", or "Yoruba culture".
           </p>
         </div>
       )}
 
       {!loading && results.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {results.map((result) => (
             <article
               key={result.title}
-              className="border border-gray-200 rounded-lg p-5 hover:border-kente-green transition-colors"
+              className="group bg-[--bg2] border border-[--border] rounded-xl p-6 hover:border-[--gold-dim] hover:bg-[--bg3] transition-all duration-300"
             >
-              <div className="flex gap-4">
+              <div className="flex flex-col md:flex-row gap-6">
                 {result.thumbnail && (
-                  <img
-                    src={result.thumbnail}
-                    alt={result.title}
-                    className="w-24 h-24 object-cover rounded flex-shrink-0"
-                  />
+                  <div className="w-full md:w-32 h-32 flex-shrink-0 overflow-hidden rounded-lg border border-[--border]">
+                    <img
+                      src={result.thumbnail}
+                      alt={result.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
                 )}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <Link
-                    href={`/articles/${encodeURIComponent(result.title)}`}
-                    className="font-display text-xl font-bold text-kente-green hover:text-kente-gold"
+                    href={`/articles/${result.slug}`}
+                    className="font-display text-2xl font-bold text-[--text] group-hover:text-[--gold] transition-colors inline-block mb-1"
                   >
                     {result.title}
                   </Link>
                   {result.description && (
-                    <p className="text-gray-500 text-sm mt-1">
+                    <p className="text-[--gold2] text-[11px] font-bold tracking-widest uppercase mb-3">
                       {result.description}
                     </p>
                   )}
-                  <p className="text-gray-600 mt-2 line-clamp-2">
+                  <p className="text-[--text2] text-[15px] leading-relaxed line-clamp-2 font-serif mb-4">
                     {result.excerpt}
                   </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-xs text-gray-400">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-[--text3] uppercase tracking-wider">
                       Source: Wikipedia
                     </span>
-                    <a
-                      href={result.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-kente-green hover:underline"
+                    <Link
+                      href={`/articles/${result.slug}`}
+                      className="text-[12px] font-bold text-[--gold] hover:text-[--gold2] transition-colors"
                     >
-                      View original
-                    </a>
+                      Read Article →
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -138,14 +149,18 @@ function SearchContent() {
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
 export default function SearchPage() {
   return (
-    <div className="max-w-4xl mx-auto px-8 py-12">
-      <Suspense fallback={<div className="py-12">Loading search...</div>}>
+    <div className="min-h-screen bg-[--bg] px-6 py-12">
+      <Suspense fallback={
+        <div className="max-w-4xl mx-auto flex flex-col items-center justify-center py-20">
+          <div className="animate-spin w-10 h-10 border-4 border-[--gold] border-t-transparent rounded-full mb-4" />
+        </div>
+      }>
         <SearchContent />
       </Suspense>
     </div>

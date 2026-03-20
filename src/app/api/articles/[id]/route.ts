@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 
 function generateSlug(title: string): string {
   return title
@@ -11,9 +12,34 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+export async function GET(req: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    const supabase = createClient();
+
+    const { data, error } = await supabase
+      .from("articles")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const supabase = createClient();
     const { title, excerpt, content, category_id } = await req.json();
 
     if (!title || !content) {
@@ -25,17 +51,25 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     const slug = generateSlug(title);
 
-    const article = {
-      id,
-      title,
-      slug,
-      excerpt: excerpt || "",
-      content,
-      category_id,
-      updated_at: new Date().toISOString(),
-    };
+    const { data, error } = await supabase
+      .from("articles")
+      .update({
+        title,
+        slug,
+        excerpt: excerpt || "",
+        content,
+        category_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
 
-    return NextResponse.json(article);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
       { error: "Internal server error" },
@@ -46,6 +80,15 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params;
+    const supabase = createClient();
+
+    const { error } = await supabase.from("articles").delete().eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(

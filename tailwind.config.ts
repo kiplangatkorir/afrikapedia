@@ -20,9 +20,9 @@ const config: Config = {
         "accent-teal": "#0E7C6B",
       },
       fontFamily: {
-        display: ["Playfair Display", "serif"],
-        sans: ["DM Sans", "sans-serif"],
-        serif: ["Noto Serif", "serif"],
+        display: ["Libre Baskerville", "serif"],
+        sans: ["Syne", "sans-serif"],
+        serif: ["Source Serif 4", "serif"],
       },
     },
   },

@@ -1,77 +1,20 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getArticle, getLocalSlugs, Article } from "@/lib/article-service";
 
-interface Article {
-  title: string;
-  extract: string;
-  thumbnail?: string;
-  description?: string;
-}
+export const revalidate = 3600; // Revalidate every hour
 
-export default function Home() {
-  const [featuredArticle, setFeaturedArticle] = useState<Article | null>(null);
-  const [randomArticles, setRandomArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
+export default async function Home() {
+  const localSlugs = getLocalSlugs();
+  const featuredSlugs = localSlugs.length > 0 
+    ? localSlugs 
+    : ["mali-empire", "ubuntu-philosophy", "ancient-egypt", "kingdom-of-aksum", "timbuktu", "mansa-musa"];
 
-  useEffect(() => {
-    async function fetchContent() {
-      // Fetch featured Africa-related articles from Wikipedia
-      const topics = [
-        "Mali Empire",
-        "Ubuntu (philosophy)",
-        "Ancient Egypt",
-        "Kingdom of Aksum",
-        "Timbuktu",
-        "Mansa Musa",
-      ];
+  const randomFeaturedSlug = featuredSlugs[Math.floor(Math.random() * featuredSlugs.length)];
+  const featuredArticle = await getArticle(randomFeaturedSlug);
 
-      const randomTopic = topics[Math.floor(Math.random() * topics.length)];
-
-      try {
-        const res = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(randomTopic)}`
-        );
-        const data = await res.json();
-        setFeaturedArticle({
-          title: data.title,
-          extract: data.extract,
-          thumbnail: data.thumbnail?.source,
-          description: data.description,
-        });
-      } catch (e) {
-        console.error("Failed to fetch featured article", e);
-      }
-
-      // Fetch random articles for sidebar
-      const otherTopics = topics.filter((t) => t !== randomTopic);
-      const shuffled = otherTopics.sort(() => 0.5 - Math.random()).slice(0, 5);
-
-      const articles = await Promise.all(
-        shuffled.map(async (topic) => {
-          try {
-            const res = await fetch(
-              `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`
-            );
-            const data = await res.json();
-            return {
-              title: data.title,
-              extract: data.extract?.slice(0, 100) + "...",
-              thumbnail: data.thumbnail?.source,
-            };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      setRandomArticles(articles.filter(Boolean) as Article[]);
-      setLoading(false);
-    }
-
-    fetchContent();
-  }, []);
+  // Get a few more random articles for the sidebar
+  const otherSlugs = featuredSlugs.filter(s => s !== randomFeaturedSlug).sort(() => 0.5 - Math.random()).slice(0, 5);
+  const randomArticles = (await Promise.all(otherSlugs.map(s => getArticle(s)))).filter(Boolean) as Article[];
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -102,15 +45,13 @@ export default function Home() {
         <main className="p-8 lg:p-9 border-r border-[--border] min-w-0">
           <MainContent
             featuredArticle={featuredArticle}
-            randomArticles={randomArticles}
-            loading={loading}
             today={today}
           />
         </main>
 
         {/* Right Sidebar */}
         <aside className="hidden lg:block p-[28px_0_40px_28px] sticky top-[61px] h-[calc(100vh-61px)] overflow-y-auto">
-          <SidebarRight articles={randomArticles} loading={loading} />
+          <SidebarRight articles={randomArticles} />
         </aside>
       </div>
     </div>
@@ -119,19 +60,19 @@ export default function Home() {
 
 function SidebarLeft() {
   const browseItems = [
-    { icon: "🏠", label: "Main Page", active: true },
-    { icon: "🎲", label: "Random Article", href: "/articles/" + encodeURIComponent(["Mali Empire", "Ubuntu (philosophy)", "Ancient Egypt"][Math.floor(Math.random() * 3)]) },
-    { icon: "⭐", label: "Featured" },
-    { icon: "🕐", label: "Recent Changes" },
+    { icon: "🏠", label: "Main Page", active: true, href: "/" },
+    { icon: "🎲", label: "Random Article", href: "/articles/random" },
+    { icon: "⭐", label: "Featured", href: "/explore" },
+    { icon: "🕒", label: "Recent Changes", href: "#" },
   ];
 
   const categories = [
     { icon: "👑", label: "Kingdoms & Empires", href: "/search?q=african+kingdoms" },
     { icon: "🏺", label: "Ancient History", href: "/search?q=ancient+africa" },
-    { icon: "✍️", label: "Languages & Scripts", href: "/search?q=african+languages" },
+    { icon: "🖋️", label: "Languages & Scripts", href: "/search?q=african+languages" },
     { icon: "🌿", label: "Indigenous Science", href: "/search?q=african+science" },
     { icon: "🎶", label: "Music & Arts", href: "/search?q=african+music" },
-    { icon: "🧬", label: "Medicine & Healing", href: "/search?q=african+medicine" },
+    { icon: "🧪", label: "Medicine & Healing", href: "/search?q=african+medicine" },
     { icon: "💡", label: "Modern Innovation", href: "/search?q=african+innovation" },
     { icon: "🗺️", label: "Geography & Ecology", href: "/search?q=african+geography" },
   ];
@@ -145,7 +86,7 @@ function SidebarLeft() {
         {browseItems.map((item) => (
           <Link
             key={item.label}
-            href={item.href || "#"}
+            href={item.href}
             className={`flex items-center gap-2 p-[7px_12px] rounded text-[13px] font-medium text-[--text2] hover:text-[--text] hover:bg-[--bg3] transition-colors ${item.active ? "text-[--gold] bg-[--gold-dim]" : ""}`}
           >
             <span className="text-sm opacity-70">{item.icon}</span>
@@ -177,19 +118,15 @@ function SidebarLeft() {
 
 function MainContent({
   featuredArticle,
-  randomArticles,
-  loading,
   today,
 }: {
   featuredArticle: Article | null;
-  randomArticles: Article[];
-  loading: boolean;
   today: string;
 }) {
-  if (loading || !featuredArticle) {
+  if (!featuredArticle) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-8 h-8 border-4 border-kente-green border-t-transparent rounded-full" />
+        <p className="text-[--text3]">Failed to load featured article.</p>
       </div>
     );
   }
@@ -227,7 +164,7 @@ function MainContent({
           </p>
 
           <Link
-            href={`/articles/${encodeURIComponent(featuredArticle.title)}`}
+            href={`/articles/${encodeURIComponent(featuredArticle.title.toLowerCase().replace(/ /g, "-"))}`}
             className="inline-flex items-center gap-2 mt-5 font-sans text-[12px] font-semibold tracking-[0.5px] text-[--gold] no-underline border-b border-[--gold2] pb-[1px] hover:text-[#e0bf6e] hover:border-[#e0bf6e] transition-colors"
           >
             Read full article <span>→</span>
@@ -239,7 +176,7 @@ function MainContent({
             <img
               src={featuredArticle.thumbnail}
               alt={featuredArticle.title}
-              className="w-full h-48 object-cover"
+              className="w-full h-auto object-cover"
             />
             <div className="p-4">
               <p className="text-[11px] text-[--text3]">
@@ -250,42 +187,45 @@ function MainContent({
         )}
       </div>
 
-      {/* Quick Search */}
-      <div className="bg-[--bg3] border border-[--border2] rounded-lg p-6 mb-10">
-        <h2 className="font-display text-xl font-bold text-[--text] mb-4">
-          Search Afrikapedia
-        </h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const q = (e.currentTarget.elements[0] as HTMLInputElement).value;
-            if (q) window.location.href = `/search?q=${encodeURIComponent(q)}`;
-          }}
-          className="flex gap-3"
+      {/* Quick Search - Client Side Form */}
+      <QuickSearch />
+    </div>
+  );
+}
+
+// Client component for the search form
+function QuickSearch() {
+  return (
+    <div className="bg-[--bg3] border border-[--border2] rounded-lg p-6 mb-10">
+      <h2 className="font-display text-xl font-bold text-[--text] mb-4">
+        Search Afrikapedia
+      </h2>
+      <form
+        action="/search"
+        method="GET"
+        className="flex gap-3"
+      >
+        <input
+          name="q"
+          type="text"
+          placeholder="Search African topics..."
+          className="flex-1 px-4 py-3 bg-[--bg] border border-[--border] rounded text-[--text] placeholder-[--text3] focus:outline-none focus:ring-2 focus:ring-[--gold]"
+        />
+        <button
+          type="submit"
+          className="px-6 py-3 bg-[--gold] text-[--bg] font-semibold rounded hover:bg-[--gold2] transition-colors"
         >
-          <input
-            type="text"
-            placeholder="Search African topics..."
-            className="flex-1 px-4 py-3 bg-[--bg] border border-[--border] rounded text-[--text] placeholder-[--text3] focus:outline-none focus:ring-2 focus:ring-[--gold]"
-          />
-          <button
-            type="submit"
-            className="px-6 py-3 bg-[--gold] text-[--bg] font-semibold rounded hover:bg-[--gold2] transition-colors"
-          >
-            Search
-          </button>
-        </form>
-      </div>
+          Search
+        </button>
+      </form>
     </div>
   );
 }
 
 function SidebarRight({
   articles,
-  loading,
 }: {
   articles: Article[];
-  loading: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -293,28 +233,20 @@ function SidebarRight({
         <div className="font-sans text-[10px] font-bold tracking-[1.8px] uppercase text-[--text3] mb-[10px] pl-3">
           Random Articles
         </div>
-        {loading ? (
-          <div className="animate-pulse space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 bg-[--bg3] rounded" />
-            ))}
-          </div>
-        ) : (
-          articles.map((article) => (
-            <Link
-              key={article.title}
-              href={`/articles/${encodeURIComponent(article.title)}`}
-              className="block p-[10px] rounded hover:bg-[--bg3] transition-colors"
-            >
-              <div className="font-display text-[13px] font-bold text-[--text] mb-1">
-                {article.title}
-              </div>
-              <div className="font-serif text-[11px] text-[--text2] line-clamp-2">
-                {article.extract}
-              </div>
-            </Link>
-          ))
-        )}
+        {articles.map((article) => (
+          <Link
+            key={article.title}
+            href={`/articles/${encodeURIComponent(article.title.toLowerCase().replace(/ /g, "-"))}`}
+            className="block p-[10px] rounded hover:bg-[--bg3] transition-colors"
+          >
+            <div className="font-display text-[13px] font-bold text-[--text] mb-1">
+              {article.title}
+            </div>
+            <div className="font-serif text-[11px] text-[--text2] line-clamp-2">
+              {article.extract}
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

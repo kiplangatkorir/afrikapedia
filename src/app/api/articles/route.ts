@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 
 function generateSlug(title: string): string {
   return title
@@ -9,6 +10,7 @@ function generateSlug(title: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClient();
     const { title, excerpt, content, category_id } = await req.json();
 
     if (!title || !content) {
@@ -20,20 +22,30 @@ export async function POST(req: NextRequest) {
 
     const slug = generateSlug(title);
 
-    const article = {
-      id: Date.now().toString(),
-      title,
-      slug,
-      excerpt: excerpt || "",
-      content,
-      category_id,
-      featured: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const { data, error } = await supabase
+      .from("articles")
+      .insert([
+        {
+          title,
+          slug,
+          excerpt: excerpt || "",
+          content,
+          category_id,
+          featured: false,
+          language_code: 'en'
+        },
+      ])
+      .select()
+      .single();
 
-    return NextResponse.json(article);
+    if (error) {
+      console.error("Supabase insert error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
   } catch (error) {
+    console.error("API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -42,5 +54,15 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json([]);
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("articles")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data);
 }
