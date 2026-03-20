@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 interface ArticleEditorProps {
   initialData?: {
     id?: string;
+    slug?: string;
     title: string;
     excerpt: string;
     content: string;
